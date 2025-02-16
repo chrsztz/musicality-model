@@ -1,0 +1,12 @@
+pandas
+numpy
+pretty_midi
+torch
+torchvision
+torchaudio
+librosa
+sounddevice
+matplotlib
+scikit-learn
+openai
+PyYAML
