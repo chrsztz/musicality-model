@@ -1,114 +1,87 @@
 import torch
 import torch.nn as nn
-import torch.optim as optim
-import torch.nn.functional as F
-from torch.utils.data import DataLoader, random_split
-import torchvision
-from torchvision import transforms
+from torchvision import models, transforms, datasets
+from torch.utils.data import DataLoader
+import numpy as np
+from sklearn.svm import LinearSVC
+from sklearn.metrics import accuracy_score
+from sklearn.manifold import TSNE
+import matplotlib.pyplot as plt
+from tqdm import tqdm
 
-# Define the dataset path (replace with your actual dataset path)
-dataset_path = 'augmented_waste_classification'  # Example: 'C:/Users/YourName/waste_images'
+# 定义数据集路径（请替换为你的实际路径）
+dataset_path = 'augmented_waste_classification'  # 示例: 'C:/Users/YourName/waste_images'
 
-# Define transformations for preprocessing images
+# 定义图像预处理变换
 transform = transforms.Compose([
-    transforms.Resize((224, 224)),  # Resize all images to 224x224 pixels
-    transforms.ToTensor(),          # Convert images to PyTorch tensors
-    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])  # Normalize with ImageNet stats
+    transforms.Resize((224, 224)),           # 将图像调整为 224x224 像素
+    transforms.RandomHorizontalFlip(),       # 随机水平翻转（数据增强）
+    transforms.RandomRotation(10),           # 随机旋转 ±10 度（数据增强）
+    transforms.ToTensor(),                   # 转换为 PyTorch 张量
+    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])  # 使用 ImageNet 统计数据归一化
 ])
 
-# Load the dataset from folders
-dataset = torchvision.datasets.ImageFolder(root=dataset_path, transform=transform)
+# 从文件夹加载数据集
+dataset = datasets.ImageFolder(root=dataset_path, transform=transform)
 
-# Split dataset into training (80%) and validation (20%) sets
+# 将数据集分为训练集（80%）和验证集（20%）
 train_size = int(0.8 * len(dataset))
 val_size = len(dataset) - train_size
-train_dataset, val_dataset = random_split(dataset, [train_size, val_size])
+train_dataset, val_dataset = torch.utils.data.random_split(dataset, [train_size, val_size])
 
-# Create data loaders for batching
-train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True)
+# 创建数据加载器
+train_loader = DataLoader(train_dataset, batch_size=64, shuffle=False)
 val_loader = DataLoader(val_dataset, batch_size=64, shuffle=False)
 
-# Define the CNN model
-class WasteClassifierCNN(nn.Module):
-    def __init__(self):
-        super(WasteClassifierCNN, self).__init__()
-        # Convolutional layers
-        self.conv1 = nn.Conv2d(3, 16, kernel_size=3, padding=1)  # 3 input channels (RGB), 16 output channels
-        self.pool = nn.MaxPool2d(2, 2)  # 2x2 max pooling
-        self.conv2 = nn.Conv2d(16, 32, kernel_size=3, padding=1)  # 16 input channels, 32 output channels
-        # Fully connected layers
-        self.fc1 = nn.Linear(32 * 56 * 56, 512)  # After two pooling layers: 224 / 4 = 56
-        self.fc2 = nn.Linear(512, 10)  # 10 output classes (one for each label)
-
-    def forward(self, x):
-        x = self.pool(F.relu(self.conv1(x)))  # Conv -> ReLU -> Pool
-        x = self.pool(F.relu(self.conv2(x)))  # Conv -> ReLU -> Pool
-        x = x.view(-1, 32 * 56 * 56)  # Flatten the tensor
-        x = F.relu(self.fc1(x))  # Fully connected -> ReLU
-        x = self.fc2(x)  # Output layer
-        return x
-
-# Check for GPU availability
-# device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+# 检查是否有 GPU 可用
 device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
 
-# Initialize the model, loss function, and optimizer
-model = WasteClassifierCNN().to(device)
-criterion = nn.CrossEntropyLoss()  # Loss function for multi-class classification
-optimizer = optim.Adam(model.parameters(), lr=0.001)  # Adam optimizer with learning rate 0.001
+# 加载预训练的 ResNet-50 并移除最后一层
+resnet50 = models.resnet50(pretrained=True)
+feature_extractor = nn.Sequential(*list(resnet50.children())[:-1])  # 去掉最后一层全连接层
+feature_extractor = feature_extractor.to(device)
+feature_extractor.eval()  # 设置为评估模式
 
-# Training loop
-num_epochs = 50
-for epoch in range(num_epochs):
-    # Training phase
-    model.train()
-    running_loss = 0.0
-    for images, labels in train_loader:
-        images, labels = images.to(device), labels.to(device)  # Move to GPU if available
-        optimizer.zero_grad()  # Clear previous gradients
-        outputs = model(images)  # Forward pass
-        loss = criterion(outputs, labels)  # Compute loss
-        loss.backward()  # Backward pass
-        optimizer.step()  # Update weights
-        running_loss += loss.item()
+# 定义特征提取函数
+def extract_features(loader, model, device):
+    features = []
+    labels = []
+    with torch.no_grad():
+        for images, targets in tqdm(loader, desc="提取特征"):
+            images = images.to(device)
+            feats = model(images).squeeze()  # 提取特征（2048 维）
+            features.append(feats.cpu().numpy())
+            labels.append(targets.numpy())
+    return np.concatenate(features), np.concatenate(labels)
 
-    # Validation phase
-    model.eval()
-    val_loss = 0.0
-    correct = 0
-    total = 0
-    with torch.no_grad():  # Disable gradient computation for validation
-        for images, labels in val_loader:
-            images, labels = images.to(device), labels.to(device)
-            outputs = model(images)
-            loss = criterion(outputs, labels)
-            val_loss += loss.item()
-            _, predicted = torch.max(outputs.data, 1)
-            total += labels.size(0)
-            correct += (predicted == labels).sum().item()
+# 提取训练集和验证集的特征
+train_features, train_labels = extract_features(train_loader, feature_extractor, device)
+val_features, val_labels = extract_features(val_loader, feature_extractor, device)
 
-    # Print progress
-    print(f'Epoch {epoch+1}/{num_epochs}, '
-          f'Train Loss: {running_loss / len(train_loader):.4f}, '
-          f'Val Loss: {val_loss / len(val_loader):.4f}, '
-          f'Val Accuracy: {100 * correct / total:.2f}%')
+# 训练 SVM 分类器
+svm = LinearSVC(max_iter=1000, C=1.0)  # C 参数控制正则化强度，可调整
+svm.fit(train_features, train_labels)
 
-# Save the trained model
-torch.save(model.state_dict(), 'waste_classifier.pth')
-print("Model saved as 'waste_classifier.pth'")
+# 在验证集上进行预测并计算准确率
+val_preds = svm.predict(val_features)
+val_accuracy = accuracy_score(val_labels, val_preds)
+print(f'验证集准确率: {val_accuracy * 100:.2f}%')
 
-# Example: How to load and use the model for inference
-"""
-# Load the model
-model = WasteClassifierCNN().to(device)
-model.load_state_dict(torch.load('waste_classifier.pth'))
-model.eval()
+# 使用 t-SNE 可视化特征
+tsne = TSNE(n_components=2, random_state=42)
+train_tsne = tsne.fit_transform(train_features)
 
-# Preprocess a new image (example)
-new_image = transform(your_image).unsqueeze(0).to(device)  # Add batch dimension
-with torch.no_grad():
-    output = model(new_image)
-    _, predicted = torch.max(output, 1)
-    predicted_label = dataset.classes[predicted.item()]
-    print(f'Predicted class: {predicted_label}')
-"""
+# 绘制 t-SNE 可视化图
+plt.figure(figsize=(10, 8))
+for i in range(len(dataset.classes)):  # 根据类别数动态绘制
+    plt.scatter(train_tsne[train_labels == i, 0], train_tsne[train_labels == i, 1], label=dataset.classes[i])
+plt.legend()
+plt.title("训练集特征的 t-SNE 可视化")
+plt.xlabel("t-SNE 维度 1")
+plt.ylabel("t-SNE 维度 2")
+plt.show()
+
+# 保存 SVM 模型（可选）
+import joblib
+joblib.dump(svm, 'waste_classifier_svm.pkl')
+print("SVM 模型已保存为 'waste_classifier_svm.pkl'")
