@@ -5,6 +5,7 @@ import pandas as pd
 import pretty_midi
 from feature_extraction import FeatureExtractor
 import torch
+import numpy as np
 from torch.utils.data import Dataset
 
 class PianoDataset(Dataset):

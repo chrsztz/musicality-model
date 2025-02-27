@@ -60,7 +60,8 @@ def main():
     dataloader = DataLoader(piano_dataset, batch_size=args.batch_size, shuffle=True)
 
     # 模型定义
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
     print(f"Using device: {device}")
 
     if args.model == 'PC_FCN':
