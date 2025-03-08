@@ -1,0 +1,4 @@
+train: augmented_waste_classification/train
+val: augmented_waste_classification/val
+nc: 10  # 类别数，如5类
+names: ['Battery', 'Biological', 'Cardboard', 'Clothes', 'Glass',"Metal","Paper","Plastic","Shoes","Trash"]

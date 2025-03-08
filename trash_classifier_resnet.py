@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 # 定义数据集路径（请替换为你的实际路径）
-dataset_path = 'augmented_waste_classification'
+dataset_path = '../datasets/augmented_waste_classification'
 
 # 定义图像预处理变换
 transform = transforms.Compose([
