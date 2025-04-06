@@ -1,0 +1,1 @@
+﻿print("Testing file write with UTF-8")

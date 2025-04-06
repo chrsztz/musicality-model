@@ -2,9 +2,9 @@ import os
 import shutil
 import random
 
-dataset_dir = "augmented_waste_classification"
-train_dir = "augmented_waste_classification/train"
-val_dir = "augmented_waste_classification/val"
+dataset_dir = "dataset-original"
+train_dir = "dataset-original/train"
+val_dir = "dataset-original/val"
 split_ratio = 0.8  # 80%训练，20%验证
 
 for category in os.listdir(dataset_dir):

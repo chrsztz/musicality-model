@@ -2,7 +2,7 @@ from ultralytics import YOLO
 def main():
     model = YOLO('yolo11s-cls.pt')
     # Start training
-    model.train(data="augmented_waste_classification", epochs=50, imgsz=224)
+    model.train(data="dataset-original", epochs=20, imgsz=256)
 if __name__ == '__main__':
     import multiprocessing
 

@@ -1,0 +1,84 @@
+audio_model:
+  feature_dim: 1024
+  frameshift: 10
+  max_length: 4096
+  model_type: audiomae
+  n_mels: 128
+  pretrained_path: pretrained/audiomae_base.pth
+  sample_rate: 32000
+datasets:
+  crocus:
+    path: data/crocus_piano
+    test_split: 0.1
+    train_split: 0.8
+    val_split: 0.1
+  expert_novice:
+    path: data/expert_novice
+    test_split: 0.1
+    train_split: 0.8
+    val_split: 0.1
+  neuropiano:
+    path: data/neuropiano
+    test_split: 0.1
+    train_split: 0.8
+    val_split: 0.1
+evaluation_dimensions:
+  descriptive:
+  - performance_understanding
+  - technical_difficulty
+  - employed_techniques
+  - compositional_background
+  - emotional_expression
+  - stylistic_authenticity
+  objective:
+  - pitch_accuracy
+  - tempo_control
+  - rhythm_precision
+  - articulation
+  - pedaling
+  - timbre_quality
+  - dynamic_control
+  - balance
+  - integrity
+llm:
+  cache_dir: F:/huggingface_cache
+  device: cuda
+  max_text_length: 512
+  model_name_or_path: Qwen/QwQ-32B
+  model_type: auto
+  tokenizer_name_or_path: Qwen/QwQ-32B
+  quantization: auto
+  generation_params:
+    temperature: 0.7
+    top_p: 0.9
+    num_beams: 5
+    max_new_tokens: 512
+    repetition_penalty: 1.2
+neuropiano_features:
+  feature_types:
+  - good_or_bad
+  - score
+  - technique
+  - physical_attributes
+  - adjectives
+  use_features: true
+qformer:
+  config_path: config/audio_config.yaml
+  cross_attention_freq: 2
+  hidden_size: 768
+  num_attention_heads: 12
+  num_hidden_layers: 6
+  num_query_tokens: 32
+training:
+  batch_size: 2
+  eval_steps: 500
+  gradient_accumulation_steps: 4
+  learning_rate: 1.0e-05
+  num_epochs: 1
+  save_steps: 1000
+  warmup_steps: 2000
+  weight_decay: 0.01
+audio_llm:
+  qformer_hidden_size: 768
+  llm_hidden_size: 4096
+  cache_dir: F:/huggingface_cache
